@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}目录下载 · metricgraph{% endblock %}
+{% block body %}
+<section class="doc-section">
+  <h1>目录下载</h1>
+  <p class="lede">任务 <span class="mono">{{ tasks|length }}</span>　占用 <span class="mono">{{ account.occupied_bytes }}</span> / <span class="mono">{{ account.capacity_bytes }}</span> 字节</p>
+  <dl class="ledger">
+    <div><dt>容量</dt><dd>{{ account.capacity_bytes }}<span class="unit">字节</span></dd></div>
+    <div><dt>已占用</dt><dd>{{ account.occupied_bytes }}<span class="unit">字节</span></dd></div>
+    <div><dt>可用</dt><dd>{{ account.available_bytes }}<span class="unit">字节</span></dd></div>
+    <div><dt>任务</dt><dd>{{ tasks|length }}<span class="unit">个</span></dd></div>
+  </dl>
+  <div class="pair">
+    <div>
+      <label for="dl-fragment-bytes">片段字节限额</label>
+      <input type="number" id="dl-fragment-bytes" min="1" value="65536" autocomplete="off">
+    </div>
+    <div>
+      <label for="dl-idem-key">幂等键（可空）</label>
+      <input type="text" id="dl-idem-key" autocomplete="off" placeholder="重试不重复建任务">
+    </div>
+    <button type="button" data-action="dl-create">创建任务</button>
+    <span class="flash" data-flash></span>
+  </div>
+</section>
+
+<section class="doc-section">
+  <h2><span class="clause">2</span>任务</h2>
+  {% if tasks %}
+  <div class="wrap-scroll">
+    <table>
+      <caption>下载任务<sup class="fn">1</sup></caption>
+      <thead>
+        <tr>
+          <th>任务</th><th>批次</th><th>状态</th><th class="num">片段限额</th>
+          <th class="num">总字节</th><th class="num">已生成</th><th class="num">占用</th>
+          <th>创建</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in tasks %}
+        <tr>
+          <td class="name">{{ item.task_id }}</td>
+          <td class="name">{{ item.run_id }}</td>
+          <td>
+            {% if item.status == 'ready' %}<span class="st st-ok">{{ item.status_label }}</span>
+            {% elif item.status == 'generating' %}<span class="st st-warn">{{ item.status_label }}</span>
+            {% else %}<span class="st st-bad">{{ item.status_label }}</span>{% endif %}
+          </td>
+          <td class="num">{{ item.fragment_bytes }}</td>
+          <td class="num">{{ item.total_bytes }}</td>
+          <td class="num">{{ item.generated_bytes }}</td>
+          <td class="num">{{ item.held_bytes }}</td>
+          <td class="name">{{ item.created_at|ts }}</td>
+          <td class="name">
+            {% if item.status in ('generating',) %}
+            <button type="button" class="ghost" data-action="dl-generate" data-task="{{ item.task_id }}">生成</button>
+            {% endif %}
+            {% if item.status in ('generating', 'ready') %}
+            <button type="button" class="ghost" data-action="dl-claim" data-task="{{ item.task_id }}">领取</button>
+            <button type="button" class="ghost" data-action="dl-resume" data-task="{{ item.task_id }}">续传</button>
+            <button type="button" class="ghost" data-action="dl-renew" data-task="{{ item.task_id }}">续租</button>
+            <button type="button" class="ghost" data-action="dl-cancel" data-task="{{ item.task_id }}">取消</button>
+            {% else %}
+            <button type="button" class="ghost" data-action="dl-resume" data-task="{{ item.task_id }}">续传</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">还没有下载任务。</p>
+  {% endif %}
+</section>
+
+{% for item in tasks %}
+<section class="doc-section">
+  <h2><span class="clause">2.{{ loop.index }}</span>片段 · {{ item.task_id }}</h2>
+  {% if item.fragments %}
+  <div class="wrap-scroll">
+    <table>
+      <caption>片段与租约<sup class="fn">2</sup></caption>
+      <thead>
+        <tr>
+          <th class="num">序号</th><th class="num">起点</th><th class="num">终点</th>
+          <th>状态</th><th>租约到期</th><th>回收原因</th><th>回收时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for frag in item.fragments %}
+        <tr>
+          <td class="num">{{ frag.seq }}</td>
+          <td class="num">{{ frag.byte_start }}</td>
+          <td class="num">{{ frag.byte_end }}</td>
+          <td>
+            {% if frag.status == 'claimed' %}<span class="st st-warn">{{ frag.status_label }}</span>
+            {% elif frag.status == 'reclaimed' %}<span class="st st-bad">{{ frag.status_label }}</span>
+            {% else %}<span class="st st-ok">{{ frag.status_label }}</span>{% endif %}
+          </td>
+          <td class="name">{{ frag.lease_expires_at|ts }}</td>
+          <td class="reason">{% if frag.reclaim_reason %}<span class="code">{{ frag.reclaim_reason|reason }}</span>{% else %}—{% endif %}</td>
+          <td class="name">{{ frag.reclaimed_at|ts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">还没有落盘片段。</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+<aside class="notes">
+  <ol class="footnotes">
+    <li>创建即锁定批次；取消释放容量，已领取片段留到租约到期再回收。<a class="back" href="#main">↩</a></li>
+    <li>租约到期后片段回到待领取；任务取消或失败时到期片段按原因回收。<a class="back" href="#main">↩</a></li>
+  </ol>
+</aside>
+{% endblock %}

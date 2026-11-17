@@ -1,6 +1,6 @@
 # 深度登记 metricgraph
 
-- 规模：中型（7 个功能模块，76 个文件，65 条测试）
+- 规模：中型（8 个功能模块，84 个文件，108 条测试）
 - 核心规则：同名同版本指标先做表达式稳定签名，再按依赖图检测环并裁决生效版本。
 - 使用者与工作流：分析治理组在指标发布前复核定义冲突、缺依赖、依赖环与版本重叠。
 
@@ -15,6 +15,7 @@
 | M5 影响面 | 看受影响的下游节点、环、断链、单边登记 | GET /api/impact | `app/modules/m5_impact/handler.py` `app/modules/m5_impact/service.py` `app/modules/m5_impact/closure.py` `app/modules/m5_impact/cycle.py` `app/modules/m5_impact/broken.py` | `tests/test_m5_impact.py` |
 | M6 版本批次 | 跑批次、看历史、验陈旧拒绝与区间重叠 | POST /api/runs | `app/modules/m6_batches/handler.py` `app/modules/m6_batches/service.py` `app/modules/m6_batches/window.py` `app/modules/m6_batches/guard.py` `app/modules/m6_batches/history.py` | `tests/test_m6_batches.py` |
 | M7 指标目录 | 导出一份定义、依赖与状态清单 | GET /api/export/catalog.csv | `app/modules/m7_migration/handler.py` `app/modules/m7_migration/service.py` `app/modules/m7_migration/csv_out.py` `app/modules/m7_migration/ledger.py` | `tests/test_m7_migration.py` |
+| M8 目录下载 | 建下载任务、按字节限额分片领取、续租续传、取消与看占用 | POST /api/downloads | `app/modules/m8_downloads/handler.py` `app/modules/m8_downloads/service.py` `app/modules/m8_downloads/fragments.py` `app/store.py` | `tests/test_m8_downloads.py` |
 
 ## 陷阱登记
 
@@ -30,6 +31,9 @@
 | TRAP-22 | 同一字段被连续改过两次名 | 只认最近一跳，最早的名字解析不到 | 跨版本改名链一路解析到底 | `app/modules/m4_mapping/rename.py` | `tests/test_m4_mapping.py::test_trap22_alias_chain_resolves_multi_hop` |
 | TRAP-25 | 两个版本生效区间重叠 | 取到哪版看运气 | 半开区间比较，重叠直接标记警告 | `app/modules/m6_batches/window.py` | `tests/test_m6_batches.py::test_trap25_overlap_flagged_but_adjacent_clean` |
 | TRAP-26 | 基于旧版本号提交 | 后提交无条件覆盖新结果 | 版本号乐观锁，基线落后即 409 | `app/modules/m6_batches/guard.py` | `tests/test_m6_batches.py::test_trap26_stale_submission_rejected` |
+| TRAP-27 | 取消下载任务立刻清理片段 | 在传片段被删，续传半路断掉 | 取消只回收未领取片段，已领取者留到租约到期再按原因回收 | `app/modules/m8_downloads/service.py` | `tests/test_m8_downloads.py::test_claimed_fragment_survives_cancel_until_lease_expiry` |
+| TRAP-28 | 占用账只放内存 | 重启后容量凭空释放，超卖容量 | 占用全部由任务表与片段表推导，重启不丢账 | `app/store.py` `app/modules/m8_downloads/service.py` | `tests/test_m8_downloads.py::test_occupancy_survives_restart` |
+| TRAP-29 | 生成中断后重跑从头再来 | 已落盘片段重复生成，字节错位 | 游标以片段表为准，逐片校验摘要后续跑 | `app/modules/m8_downloads/service.py` | `tests/test_m8_downloads.py::test_generate_resumes_after_interruption` |
 
 ## 对账规则
 
@@ -46,3 +50,4 @@
 - 类型格只覆盖数值、字符、时间、布尔四族；映射表、数组、结构体一律算 `unknown`，保守判破坏。
 - 生效区间重叠只标记不阻断，最终以版本序号为准。
 - 打印页脚用 `counter(page)`，Chrome 打印预览不渲染该计数。
+- 目录下载的分片按字节硬切，片段边界可能落在多字节字符中间，客户端须按序号拼接后再解码。

@@ -55,6 +55,14 @@ docker compose up -d --build
 | GET | `/api/export/refs.csv` | 引用账 CSV |
 | GET | `/api/export/ledger.csv` | 账目 CSV |
 | GET | `/api/export/manifest.json` | 运行清单 |
+| POST | `/api/downloads` | 建目录下载任务，锁定当前批次，幂等键去重 |
+| GET | `/api/downloads` | 任务清单与容量占用账 |
+| GET | `/api/downloads/{task_id}` | 任务明细与片段租约 |
+| POST | `/api/downloads/{task_id}/generate` | 生成片段，中断后续跑 |
+| POST | `/api/downloads/{task_id}/claim` | 领取片段，签发租约 |
+| POST | `/api/downloads/{task_id}/renew` | 续租，过期凭证 409 |
+| POST | `/api/downloads/{task_id}/resume` | 凭租约续传片段，取消后仍服务到到期 |
+| POST | `/api/downloads/{task_id}/cancel` | 取消任务，释放未领取片段容量 |
 
 ## 6 失败处置
 
@@ -64,6 +72,9 @@ docker compose up -d --build
 | 400 `WINDOW_INVERTED` | 生效区间起点不早于终点 | 检查 `effective_from` / `effective_to` |
 | 400 `BAD_INPUT` | 文件名、参数或 JSON 结构不对 | 看返回的 `detail` |
 | 404 `NOT_FOUND` | 还没跑过批次 | 先在 `/batches` 点「跑一次」 |
+| 409 `CAPACITY_EXCEEDED` | 下载任务预留超出剩余容量 | 取消旧任务或等在租片段到期回收 |
+| 409 `LEASE_EXPIRED` | 租约到期，凭证失效 | 重新领取片段 |
+| 409 `TASK_CANCELLED` | 任务已取消，不再发新片段与续租 | 已领取片段可在到期前续传 |
 
 ## 7 端口与并发
 

@@ -14,6 +14,7 @@ PAGES = [
     ("/impact", "影响面"),
     ("/batches", "版本历史"),
     ("/spec", "迁移单"),
+    ("/downloads", "目录下载"),
 ]
 
 

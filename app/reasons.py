@@ -53,6 +53,11 @@ CODES: dict[str, tuple[str, str]] = {
     "COMPATIBLE": ("兼容", "info"),
     "COMPATIBLE_BY_MAPPING": ("加别名后兼容", "warn"),
     "BREAKING": ("破坏", "break"),
+    # 目录下载
+    "LEASE_EXPIRED": ("租约到期回收", "warn"),
+    "TASK_CANCELLED": ("任务取消回收", "warn"),
+    "GEN_FAILED": ("生成失败回收", "break"),
+    "CAPACITY_EXCEEDED": ("容量不足已拒绝", "break"),
 }
 
 # 类型收窄细分，挂在明细里，不进码表
